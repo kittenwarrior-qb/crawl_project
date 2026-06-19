@@ -1,0 +1,20 @@
+# ===== Bí mật / token — TUYỆT ĐỐI không đẩy lên =====
+youpass.txt
+chatbot-ui/config.json
+.env
+*.token
+
+# ===== Node =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== File ảnh/dữ liệu lớn cục bộ =====
+*.png
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

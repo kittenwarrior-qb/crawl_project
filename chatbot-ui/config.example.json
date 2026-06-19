@@ -1,0 +1,15 @@
+{
+  "token": "DÁN_X-YOUPASS-TOKEN_VÀO_ĐÂY",
+  "user_info": {
+    "id": "user-id",
+    "email": "email@example.com",
+    "fullname": "Tên của bạn",
+    "role": {
+      "id": "role-id",
+      "name": "End User",
+      "icon": "supervised_user_circle",
+      "description": "",
+      "public_id": "END_USER"
+    }
+  }
+}
