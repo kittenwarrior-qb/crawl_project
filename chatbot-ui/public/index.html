@@ -59,6 +59,17 @@
   }
   #panel.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: auto; }
   #panel.expanded { width: min(480px, 92vw); height: min(82vh, 760px); }
+  #panel.fullscreen {
+    right: 0; bottom: 0; left: 0; top: 0;
+    width: 100vw; height: 100dvh; border-radius: 0;
+  }
+  /* khi đã "bay" qua cửa sổ Picture-in-Picture: lấp đầy toàn bộ cửa sổ đó */
+  #panel.in-pip {
+    position: fixed; inset: 0; right: auto; bottom: auto;
+    width: 100%; height: 100%; border-radius: 0;
+    transform: none; opacity: 1; pointer-events: auto;
+  }
+  #panel.in-pip .size-btn { display: none; }
 
   .header {
     flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
@@ -73,6 +84,7 @@
     justify-content: center; font-size: 15px; flex: 0 0 auto;
   }
   .icon-btn:hover { background: rgba(255,255,255,.26); }
+  .icon-btn.pip-btn { width: auto; border-radius: 14px; padding: 0 9px; font-size: 11px; font-weight: 700; letter-spacing: .3px; }
 
   .body-wrap { flex: 1; position: relative; overflow: hidden; }
 
@@ -155,13 +167,14 @@
 
   /* ---------- Mobile: fullscreen kiểu Claude ---------- */
   @media (max-width: 600px) {
-    #panel, #panel.expanded {
+    #panel, #panel.expanded, #panel.fullscreen {
       right: 0; bottom: 0; left: 0; top: 0;
       width: 100vw; height: 100dvh; border-radius: 0;
     }
     #launcher { right: 16px; bottom: 16px; }
     .header { padding: max(12px, env(safe-area-inset-top)) 14px 12px; }
     .footer { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+    #btnPip, #btnSize { display: none; } /* PiP & toggle cỡ không cần trên mobile, đã fullscreen sẵn */
   }
 </style>
 </head>
@@ -177,7 +190,8 @@
       <img class="avatar" src="https://chatbot-1984.youpass.vn/assets/anh_dau_mascot_96.png" alt="" />
       <div class="title">Anh Giáo Đậu</div>
       <button class="icon-btn" id="btnNewChat" title="Cuộc trò chuyện mới">＋</button>
-      <button class="icon-btn" id="btnExpand" title="Thu/phóng">⤢</button>
+      <button class="icon-btn pip-btn size-btn" id="btnPip" title="Nổi qua tab khác (Picture-in-Picture)">PiP</button>
+      <button class="icon-btn size-btn" id="btnSize" title="Phóng to">⤢</button>
       <button class="icon-btn" id="btnClose" title="Đóng">✕</button>
     </div>
 
@@ -271,8 +285,81 @@ function closePanel() {
   launcher.classList.remove('hidden');
 }
 launcher.addEventListener('click', openPanel);
-document.getElementById('btnClose').addEventListener('click', closePanel);
-document.getElementById('btnExpand').addEventListener('click', () => panel.classList.toggle('expanded'));
+document.getElementById('btnClose').addEventListener('click', () => {
+  if (pipWin) { pipWin.close(); return; } // đóng cửa sổ PiP -> tự kéo panel về rồi đóng luôn
+  closePanel();
+});
+
+/* ---------- 3 cỡ: compact -> medium -> fullscreen -> compact ---------- */
+const btnSize = document.getElementById('btnSize');
+let sizeState = 'compact';
+const SIZE_TITLES = { compact: 'Phóng to', medium: 'Toàn màn hình', fullscreen: 'Thu nhỏ' };
+function applySize() {
+  panel.classList.remove('expanded', 'fullscreen');
+  if (sizeState === 'medium') panel.classList.add('expanded');
+  if (sizeState === 'fullscreen') panel.classList.add('fullscreen');
+  btnSize.title = SIZE_TITLES[sizeState];
+}
+btnSize.addEventListener('click', () => {
+  sizeState = sizeState === 'compact' ? 'medium' : sizeState === 'medium' ? 'fullscreen' : 'compact';
+  applySize();
+});
+
+/* ---------- Picture-in-Picture: panel "bay" sang cửa sổ nổi, theo qua mọi tab ---------- */
+const btnPip = document.getElementById('btnPip');
+let pipWin = null;
+
+if (!('documentPictureInPicture' in window)) {
+  btnPip.style.display = 'none';
+}
+
+function copyStylesInto(doc) {
+  [...document.styleSheets].forEach((sheet) => {
+    try {
+      const css = [...sheet.cssRules].map((r) => r.cssText).join('\n');
+      const style = doc.createElement('style');
+      style.textContent = css;
+      doc.head.appendChild(style);
+    } catch (e) {
+      if (sheet.href) {
+        const link = doc.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = sheet.href;
+        doc.head.appendChild(link);
+      }
+    }
+  });
+  const base = doc.createElement('style');
+  base.textContent = 'html,body{margin:0;height:100%;background:#eef1f7;}';
+  doc.head.appendChild(base);
+}
+
+async function enterPip() {
+  try {
+    pipWin = await documentPictureInPicture.requestWindow({ width: 380, height: 600 });
+  } catch (e) {
+    showToast('Không mở được Picture-in-Picture: ' + e.message);
+    return;
+  }
+  copyStylesInto(pipWin.document);
+  pipWin.document.title = 'Anh Giáo Đậu';
+  pipWin.document.body.appendChild(panel);
+  panel.classList.add('in-pip', 'open');
+  launcher.classList.add('hidden');
+  btnPip.title = 'Đang nổi qua tab khác — bấm để đóng';
+
+  pipWin.addEventListener('pagehide', () => {
+    document.body.appendChild(panel);
+    panel.classList.remove('in-pip');
+    pipWin = null;
+    btnPip.title = 'Nổi qua tab khác (Picture-in-Picture)';
+  }, { once: true });
+}
+
+btnPip.addEventListener('click', () => {
+  if (pipWin) { pipWin.close(); return; }
+  enterPip();
+});
 
 /* ---------- settings pane ---------- */
 function openSettings() {
