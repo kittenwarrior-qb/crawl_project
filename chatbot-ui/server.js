@@ -12,10 +12,22 @@ const crypto = require('crypto');
 const PORT = 3000;
 const UPSTREAM = 'https://chatbot-1984.youpass.vn/chat/stream';
 
+// 2 "kênh" quan sát được trên web thật của YouPass: widget ở trang chủ (origin youpass.vn)
+// và widget trong trang học (origin e-learning.youpass.vn) -- nghi vấn backend phản hồi
+// khác nhau tuỳ Origin/Referer (ví dụ kênh "main" không tự bám lesson context).
+const CHANNELS = {
+  elearning: { origin: 'https://e-learning.youpass.vn', referer: 'https://e-learning.youpass.vn/' },
+  main: { origin: 'https://youpass.vn', referer: 'https://youpass.vn/' },
+};
+
 function loadConfig() {
   // Đọc lại mỗi request -> sửa token trong config.json là có hiệu lực ngay,
-  // không cần restart server.
-  return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  // không cần restart server. Chưa tạo config.json (vd. dùng token nhập trong UI) -> {}.
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  } catch (e) {
+    return { token: '', user_info: {} };
+  }
 }
 
 // ---- Phục vụ file tĩnh trong /public ----
@@ -61,6 +73,8 @@ function handleChat(req, res) {
       auth_token: token,
     });
 
+    const channel = CHANNELS[input.channel] || CHANNELS.elearning;
+
     const u = new URL(UPSTREAM);
     const upstream = https.request(
       {
@@ -70,8 +84,8 @@ function handleChat(req, res) {
         headers: {
           'content-type': 'application/json',
           accept: '*/*',
-          origin: 'https://e-learning.youpass.vn',
-          referer: 'https://e-learning.youpass.vn/',
+          origin: channel.origin,
+          referer: channel.referer,
           'x-youpass-token': token,
           cookie: 'auth_token=' + token,
           'content-length': Buffer.byteLength(payload),
