@@ -46,14 +46,19 @@ function handleChat(req, res) {
       return;
     }
 
+    // token/user_info ưu tiên lấy từ request của widget (ô ⚙ Cài đặt lưu localStorage),
+    // nếu widget không gửi (form cũ) thì rơi về config.json.
+    const token = input.token || cfg.token;
+    const userInfo = input.user_info && input.user_info.fullname ? input.user_info : cfg.user_info;
+
     // Dựng payload đúng như curl gốc yêu cầu.
     const payload = JSON.stringify({
       email: '',
       message: input.message || '',
       conversation_id: input.conversation_id || crypto.randomUUID(),
       lesson_context: input.lesson_context || { url: '', content_text: '' },
-      user_info: cfg.user_info,
-      auth_token: cfg.token,
+      user_info: userInfo,
+      auth_token: token,
     });
 
     const u = new URL(UPSTREAM);
@@ -67,8 +72,8 @@ function handleChat(req, res) {
           accept: '*/*',
           origin: 'https://e-learning.youpass.vn',
           referer: 'https://e-learning.youpass.vn/',
-          'x-youpass-token': cfg.token,
-          cookie: 'auth_token=' + cfg.token,
+          'x-youpass-token': token,
+          cookie: 'auth_token=' + token,
           'content-length': Buffer.byteLength(payload),
         },
       },
